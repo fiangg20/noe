@@ -1,6 +1,21 @@
 package com.noe.app.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -55,9 +70,8 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FloatingActionButtonMenu
-import androidx.compose.material3.FloatingActionButtonMenuItem
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -75,7 +89,6 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
@@ -114,7 +127,7 @@ private fun Section.title(): String = when (this) {
     is Section.Label -> name
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(vm: NotesViewModel, gridState: LazyStaggeredGridState) {
     val context = LocalContext.current
@@ -403,47 +416,22 @@ fun HomeScreen(vm: NotesViewModel, gridState: LazyStaggeredGridState) {
                             ) { fabExpanded = false },
                     )
                 }
-                FloatingActionButtonMenu(
+                NewNoteFab(
                     expanded = fabExpanded,
+                    onToggle = { fabExpanded = !fabExpanded },
+                    onChecklist = {
+                        fabExpanded = false
+                        vm.openNew(checklist = true)
+                    },
+                    onNote = {
+                        fabExpanded = false
+                        vm.openNew(checklist = false)
+                    },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .navigationBarsPadding()
                         .padding(16.dp),
-                    button = {
-                        ToggleFloatingActionButton(
-                            checked = fabExpanded,
-                            onCheckedChange = { fabExpanded = it },
-                        ) {
-                            val icon by remember {
-                                derivedStateOf {
-                                    if (checkedProgress > 0.5f) Icons.Filled.Close else Icons.Filled.Add
-                                }
-                            }
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = "New note",
-                                modifier = Modifier.animateIcon({ checkedProgress }),
-                            )
-                        }
-                    },
-                ) {
-                    FloatingActionButtonMenuItem(
-                        onClick = {
-                            fabExpanded = false
-                            vm.openNew(checklist = true)
-                        },
-                        icon = { Icon(Icons.Outlined.Checklist, contentDescription = null) },
-                        text = { Text("Checklist") },
-                    )
-                    FloatingActionButtonMenuItem(
-                        onClick = {
-                            fabExpanded = false
-                            vm.openNew(checklist = false)
-                        },
-                        icon = { Icon(Icons.Outlined.Description, contentDescription = null) },
-                        text = { Text("Note") },
-                    )
-                }
+                )
             }
         }
     }
@@ -711,5 +699,76 @@ private fun EmptyHome(section: Section, searching: Boolean) {
                 alternateShape = true,
             )
         }
+    }
+}
+
+
+/** Expandable "new note" button. Springs, a rotating plus and a morphing corner give it the Expressive feel. */
+@Composable
+private fun NewNoteFab(
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onChecklist: () -> Unit,
+    onNote: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val rotation by animateFloatAsState(
+        targetValue = if (expanded) 135f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "fabRotation",
+    )
+    val corner by animateDpAsState(
+        targetValue = if (expanded) 30.dp else 18.dp,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "fabCorner",
+    )
+
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        AnimatedVisibility(
+            visible = expanded,
+            enter = fadeIn() +
+                scaleIn(initialScale = 0.6f, transformOrigin = TransformOrigin(1f, 1f)) +
+                slideInVertically { it / 2 },
+            exit = fadeOut() +
+                scaleOut(targetScale = 0.6f, transformOrigin = TransformOrigin(1f, 1f)) +
+                slideOutVertically { it / 2 },
+        ) {
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                MenuFab("Checklist", Icons.Outlined.Checklist, onChecklist)
+                MenuFab("Note", Icons.Outlined.Description, onNote)
+            }
+        }
+        FloatingActionButton(
+            onClick = onToggle,
+            shape = RoundedCornerShape(corner),
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Add,
+                contentDescription = if (expanded) "Close menu" else "New note",
+                modifier = Modifier.rotate(rotation),
+            )
+        }
+    }
+}
+
+@Composable
+private fun MenuFab(label: String, icon: ImageVector, onClick: () -> Unit) {
+    ExtendedFloatingActionButton(
+        onClick = onClick,
+        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+    ) {
+        Icon(icon, contentDescription = null)
+        Spacer(Modifier.width(12.dp))
+        Text(label)
     }
 }
