@@ -36,15 +36,22 @@ import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -271,7 +278,30 @@ fun NoteCard(
 }
 
 /** Empty-state illustration: a slowly rotating Material Expressive cookie shape behind an icon. */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+/** A scalloped "cookie" outline with the given number of lobes. */
+class CookieShape(private val lobes: Int, private val depth: Float = 0.07f) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density,
+    ): Outline {
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+        val radius = minOf(cx, cy)
+        val steps = 240
+        val path = Path()
+        for (i in 0..steps) {
+            val t = (i.toFloat() / steps) * 2f * PI.toFloat()
+            val r = radius * (1f - depth + depth * cos(lobes * t))
+            val x = cx + r * cos(t)
+            val y = cy + r * sin(t)
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        path.close()
+        return Outline.Generic(path)
+    }
+}
+
 @Composable
 fun EmptyState(
     icon: ImageVector,
@@ -280,7 +310,7 @@ fun EmptyState(
     modifier: Modifier = Modifier,
     alternateShape: Boolean = false,
 ) {
-    val shape = (if (alternateShape) MaterialShapes.Cookie7Sided else MaterialShapes.Cookie9Sided).toShape()
+    val shape = remember(alternateShape) { CookieShape(if (alternateShape) 7 else 9) }
     val transition = rememberInfiniteTransition(label = "emptySpin")
     val angle by transition.animateFloat(
         initialValue = 0f,
