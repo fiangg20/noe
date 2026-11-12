@@ -7,6 +7,7 @@ import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
@@ -14,7 +15,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +29,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -32,8 +37,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Alarm
-import androidx.compose.material.icons.outlined.CheckBox
-import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.Icon
@@ -64,8 +67,10 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import com.noe.app.data.Note
+import com.noe.app.data.Repeat
 import com.noe.app.ui.theme.noteContainerColor
 import com.noe.app.ui.theme.noteContentColor
 import java.text.DateFormat
@@ -128,6 +133,7 @@ fun NoteCard(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onToggleItem: ((String) -> Unit)? = null,
 ) {
     val dark = isDarkSurface()
     val scheme = MaterialTheme.colorScheme
@@ -151,11 +157,26 @@ fun NoteCard(
     )
     val shape = RoundedCornerShape(corner)
 
+    // Cards dip slightly when pressed and spring back.
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.96f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "cardPress",
+    )
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
             .clip(shape)
             .combinedClickable(
+                interactionSource = interaction,
+                indication = LocalIndication.current,
                 onClick = onClick,
                 onLongClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -188,16 +209,21 @@ fun NoteCard(
                     if (note.title.isNotBlank() && shown.isNotEmpty()) Spacer(Modifier.height(8.dp))
                     shown.take(6).forEach { item ->
                         Row(
-                            modifier = Modifier.padding(vertical = 2.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .offset(x = (-5).dp),
                             verticalAlignment = Alignment.Top,
                         ) {
-                            Icon(
-                                imageVector = if (item.checked) Icons.Outlined.CheckBox
-                                else Icons.Outlined.CheckBoxOutlineBlank,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
+                            MorphCheck(
+                                checked = item.checked,
+                                onCheckedChange = { onToggleItem?.invoke(item.id) },
+                                tint = content,
+                                checkColor = container,
+                                size = 18.dp,
+                                touch = 28.dp,
+                                enabled = onToggleItem != null,
                             )
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(2.dp))
                             Text(
                                 text = item.text,
                                 style = MaterialTheme.typography.bodyMedium,
@@ -205,6 +231,9 @@ fun NoteCard(
                                 overflow = TextOverflow.Ellipsis,
                                 textDecoration = if (item.checked) TextDecoration.LineThrough else null,
                                 color = if (item.checked) content.copy(alpha = 0.6f) else content,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(top = 4.dp),
                             )
                         }
                     }
@@ -213,14 +242,36 @@ fun NoteCard(
                             text = "+${shown.size - 6} more",
                             style = MaterialTheme.typography.labelMedium,
                             color = content.copy(alpha = 0.7f),
-                            modifier = Modifier.padding(top = 4.dp),
+                            modifier = Modifier.padding(top = 2.dp),
                         )
+                    }
+                    if (shown.isNotEmpty()) {
+                        val done = shown.count { it.checked }
+                        Spacer(Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            WavyProgress(
+                                progress = done.toFloat() / shown.size,
+                                color = content,
+                                strokeWidth = 3.dp,
+                                amplitude = 2.dp,
+                                wavelength = 14.dp,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "$done/${shown.size}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = content.copy(alpha = 0.8f),
+                            )
+                        }
                     }
                 } else if (note.body.isNotBlank()) {
                     if (note.title.isNotBlank()) Spacer(Modifier.height(8.dp))
+                    val bodyStyle = MaterialTheme.typography.bodyMedium
+                    val richBody = remember(note.body, note.spans) { styledText(note.body, note.spans) }
                     Text(
-                        text = note.body,
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = richBody,
+                        style = if (note.spans.isEmpty()) bodyStyle else bodyStyle.copy(lineHeight = TextUnit.Unspecified),
                         maxLines = 10,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -235,10 +286,11 @@ fun NoteCard(
                     ) {
                         note.reminderAt?.let { at ->
                             SmallPill(
-                                text = Fmt.dateTime(at),
+                                text = Fmt.dateTime(at) +
+                                    if (note.repeat != Repeat.None) " · ${note.repeat.label}" else "",
                                 color = content,
                                 icon = Icons.Outlined.Alarm,
-                                strike = at < System.currentTimeMillis(),
+                                strike = at < System.currentTimeMillis() && note.repeat == Repeat.None,
                             )
                         }
                         note.labels.forEach { SmallPill(text = it, color = content) }
@@ -277,7 +329,6 @@ fun NoteCard(
     }
 }
 
-/** Empty-state illustration: a slowly rotating Material Expressive cookie shape behind an icon. */
 /** A scalloped "cookie" outline with the given number of lobes. */
 class CookieShape(private val lobes: Int, private val depth: Float = 0.07f) : Shape {
     override fun createOutline(

@@ -46,6 +46,6 @@ class MainActivity : ComponentActivity() {
         val noteId = intent.getStringExtra(Reminders.EXTRA_NOTE_ID)
         val sharedText =
             if (intent.action == Intent.ACTION_SEND) intent.getStringExtra(Intent.EXTRA_TEXT) else null
-        viewModel.handleLaunch(noteId, sharedText)
+        viewModel.handleLaunch(noteId, sharedText, intent.getStringExtra("noe_action"))
     }
 }

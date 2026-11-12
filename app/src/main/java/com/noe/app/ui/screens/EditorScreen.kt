@@ -1,12 +1,17 @@
 package com.noe.app.ui.screens
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -41,15 +47,16 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.FileCopy
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Sell
+import androidx.compose.material.icons.outlined.TextFormat
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material3.BottomAppBar
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -84,16 +91,23 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import com.noe.app.data.ChecklistItem
+import com.noe.app.data.Repeat
 import com.noe.app.data.Reminders
 import com.noe.app.ui.EditorState
 import com.noe.app.ui.NotesViewModel
 import com.noe.app.ui.components.ColorPickerDialog
+import com.noe.app.ui.components.FormatBar
 import com.noe.app.ui.components.Fmt
 import com.noe.app.ui.components.LabelDialog
+import com.noe.app.ui.components.MorphCheck
 import com.noe.app.ui.components.ReminderDialog
 import com.noe.app.ui.components.SmallPill
+import com.noe.app.ui.components.SpanTransformation
+import com.noe.app.ui.components.WavyProgress
 import com.noe.app.ui.components.isDarkSurface
 import com.noe.app.ui.components.shareText
 import com.noe.app.ui.theme.noteContainerColor
@@ -116,6 +130,7 @@ fun EditorScreen(vm: NotesViewModel, editor: EditorState) {
     var showLabels by remember { mutableStateOf(false) }
     var showReminder by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+    var showFormat by rememberSaveable { mutableStateOf(false) }
 
     val titleFocus = remember { FocusRequester() }
     val existing = vm.notes.firstOrNull { it.id == editor.id }
@@ -178,8 +193,19 @@ fun EditorScreen(vm: NotesViewModel, editor: EditorState) {
                         }
                         DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                             DropdownMenuItem(
-                                text = { Text("Duplicate") },
+                                text = { Text("Copy to clipboard") },
                                 leadingIcon = { Icon(Icons.Outlined.ContentCopy, null) },
+                                onClick = {
+                                    showMenu = false
+                                    val text = editor.toNote().shareText()
+                                    val clipboard = context.getSystemService(ClipboardManager::class.java)
+                                    clipboard?.setPrimaryClip(ClipData.newPlainText("Noe", text))
+                                    Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Duplicate") },
+                                leadingIcon = { Icon(Icons.Outlined.FileCopy, null) },
                                 onClick = {
                                     showMenu = false
                                     vm.duplicateFromEditor()
@@ -214,6 +240,20 @@ fun EditorScreen(vm: NotesViewModel, editor: EditorState) {
             )
         },
         bottomBar = {
+            Column {
+            AnimatedVisibility(
+                visible = showFormat && !editor.isChecklist,
+                enter = expandVertically() + androidx.compose.animation.fadeIn(),
+                exit = shrinkVertically() + androidx.compose.animation.fadeOut(),
+            ) {
+                FormatBar(
+                    format = editor.currentFormat(),
+                    tint = content,
+                    onToggle = { editor.toggleFormat(it) },
+                    onSize = { editor.setTextSize(it) },
+                    onClear = { editor.clearFormatting() },
+                )
+            }
             BottomAppBar(
                 containerColor = Color.Transparent,
                 contentColor = content,
@@ -224,6 +264,15 @@ fun EditorScreen(vm: NotesViewModel, editor: EditorState) {
                     IconButton(onClick = { showLabels = true }) {
                         Icon(Icons.Outlined.Sell, contentDescription = "Labels")
                     }
+                    if (!editor.isChecklist) {
+                        IconButton(onClick = { showFormat = !showFormat }) {
+                            Icon(
+                                imageVector = Icons.Outlined.TextFormat,
+                                contentDescription = "Text formatting",
+                                tint = if (showFormat) scheme.primary else content,
+                            )
+                        }
+                    }
                     IconButton(onClick = { editor.toggleChecklist() }) {
                         Icon(
                             imageVector = if (editor.isChecklist) Icons.Outlined.Description
@@ -233,13 +282,21 @@ fun EditorScreen(vm: NotesViewModel, editor: EditorState) {
                     }
                     Spacer(Modifier.weight(1f))
                     Text(
-                        text = if (existing != null) "Edited ${Fmt.relative(existing.updatedAt)}" else "New note",
+                        text = run {
+                            val words = editor.wordCount()
+                            val wordText = if (words == 1) "1 word" else "$words words"
+                            wordText + " · " +
+                                if (existing != null) "Edited ${Fmt.relative(existing.updatedAt)}" else "New note"
+                        },
                         style = MaterialTheme.typography.labelMedium,
                         color = content.copy(alpha = 0.7f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(end = 16.dp),
                     )
                 },
             )
+            }
         },
     ) { padding ->
         Column(
@@ -281,10 +338,11 @@ fun EditorScreen(vm: NotesViewModel, editor: EditorState) {
                 ) {
                     if (reminder != null) {
                         SmallPill(
-                            text = Fmt.dateTime(reminder),
+                            text = Fmt.dateTime(reminder) +
+                                if (editor.repeat != Repeat.None) " · ${editor.repeat.label}" else "",
                             color = content,
                             icon = Icons.Outlined.Alarm,
-                            strike = reminder < System.currentTimeMillis(),
+                            strike = reminder < System.currentTimeMillis() && editor.repeat == Repeat.None,
                             modifier = Modifier
                                 .clip(CircleShape)
                                 .clickable { showReminder = true },
@@ -305,12 +363,17 @@ fun EditorScreen(vm: NotesViewModel, editor: EditorState) {
             Spacer(Modifier.size(12.dp))
 
             if (editor.isChecklist) {
-                ChecklistEditor(editor = editor, content = content)
+                ChecklistEditor(editor = editor, content = content, container = container)
             } else {
+                val bodyTransformation = remember(editor.spans) { SpanTransformation(editor.spans) }
                 BasicTextField(
-                    value = editor.body,
-                    onValueChange = { editor.body = it },
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = content),
+                    value = editor.bodyValue,
+                    onValueChange = { editor.onBodyChange(it) },
+                    visualTransformation = bodyTransformation,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(
+                        color = content,
+                        lineHeight = TextUnit.Unspecified,
+                    ),
                     cursorBrush = SolidColor(content),
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     modifier = Modifier
@@ -360,15 +423,18 @@ fun EditorScreen(vm: NotesViewModel, editor: EditorState) {
     if (showReminder) {
         ReminderDialog(
             current = editor.reminderAt,
-            onSet = { at ->
+            currentRepeat = editor.repeat,
+            onSet = { at, repeat ->
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !Reminders.canNotify(context)) {
                     notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
                 editor.reminderAt = at
+                editor.repeat = repeat
                 showReminder = false
             },
             onClear = {
                 editor.reminderAt = null
+                editor.repeat = Repeat.None
                 showReminder = false
             },
             onDismiss = { showReminder = false },
@@ -377,20 +443,43 @@ fun EditorScreen(vm: NotesViewModel, editor: EditorState) {
 }
 
 @Composable
-private fun ChecklistEditor(editor: EditorState, content: Color) {
+private fun ChecklistEditor(editor: EditorState, content: Color, container: Color) {
     var focusId by remember { mutableStateOf<String?>(null) }
     var showDone by rememberSaveable { mutableStateOf(true) }
 
     val active = editor.items.filter { !it.checked }
     val done = editor.items.filter { it.checked }
 
+    val (doneCount, totalCount) = editor.progress()
+
     Column {
+        if (totalCount > 0) {
+            Row(
+                modifier = Modifier.padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                WavyProgress(
+                    progress = doneCount.toFloat() / totalCount,
+                    color = content,
+                    animate = true,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    text = "$doneCount of $totalCount",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = content.copy(alpha = 0.8f),
+                )
+            }
+        }
+
         active.forEach { item ->
             key(item.id) {
                 ChecklistRow(
                     editor = editor,
                     item = item,
                     content = content,
+                    container = container,
                     focusId = focusId,
                     onFocusHandled = { focusId = null },
                     onFocusRequest = { focusId = it },
@@ -430,7 +519,16 @@ private fun ChecklistEditor(editor: EditorState, content: Color) {
                     text = "${done.size} completed",
                     style = MaterialTheme.typography.labelLarge,
                     color = content.copy(alpha = 0.8f),
+                    modifier = Modifier.weight(1f),
                 )
+                TextButton(
+                    onClick = {
+                        editor.items.removeAll { it.checked }
+                        if (editor.items.isEmpty()) editor.items.add(ChecklistItem())
+                    },
+                ) {
+                    Text("Clear", color = content)
+                }
             }
             if (showDone) {
                 done.forEach { item ->
@@ -439,6 +537,7 @@ private fun ChecklistEditor(editor: EditorState, content: Color) {
                             editor = editor,
                             item = item,
                             content = content,
+                            container = container,
                             focusId = focusId,
                             onFocusHandled = { focusId = null },
                             onFocusRequest = { focusId = it },
@@ -455,6 +554,7 @@ private fun ChecklistRow(
     editor: EditorState,
     item: ChecklistItem,
     content: Color,
+    container: Color,
     focusId: String?,
     onFocusHandled: () -> Unit,
     onFocusRequest: (String) -> Unit,
@@ -476,13 +576,21 @@ private fun ChecklistRow(
         else if (i >= 0) editor.items[i] = editor.items[i].copy(text = "", checked = false)
     }
 
-    Row(verticalAlignment = Alignment.Top) {
-        Checkbox(
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .offset(x = (-8).dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        MorphCheck(
             checked = item.checked,
             onCheckedChange = { checked ->
                 val i = indexOfItem()
                 if (i >= 0) editor.items[i] = editor.items[i].copy(checked = checked)
             },
+            tint = content,
+            checkColor = container,
+            modifier = Modifier.padding(top = 4.dp),
         )
         BasicTextField(
             value = item.text,

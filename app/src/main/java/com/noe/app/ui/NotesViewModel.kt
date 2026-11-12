@@ -25,6 +25,15 @@ sealed interface Section {
     data class Label(val name: String) : Section
 }
 
+/** Quick filter chips shown above the notes grid. */
+enum class NoteFilter(val label: String) {
+    All("All"),
+    Notes("Notes"),
+    Checklists("Checklists"),
+    WithReminder("Reminders"),
+    Colored("Colored"),
+}
+
 class UndoAction(val message: String, val revert: () -> Unit) {
     val key: Long = System.nanoTime()
 }
@@ -48,6 +57,9 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         private set
 
     var query by mutableStateOf("")
+
+    var noteFilter by mutableStateOf(NoteFilter.All)
+        private set
 
     var editor by mutableStateOf<EditorState?>(null)
         private set
@@ -95,8 +107,19 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
             is Section.Label -> notes.filter { !it.trashed && s.name in it.labels }
         }
 
+        val chip = noteFilter
+        val chipped = if (chip == NoteFilter.All || (s != Section.Notes && s !is Section.Label)) base else base.filter { n ->
+            when (chip) {
+                NoteFilter.All -> true
+                NoteFilter.Notes -> !n.isChecklist
+                NoteFilter.Checklists -> n.isChecklist
+                NoteFilter.WithReminder -> n.reminderAt != null
+                NoteFilter.Colored -> n.colorIndex != 0
+            }
+        }
+
         val q = query.trim().lowercase()
-        val filtered = if (q.isEmpty()) base else base.filter { n ->
+        val filtered = if (q.isEmpty()) chipped else chipped.filter { n ->
             n.title.lowercase().contains(q) ||
                 n.contentText().lowercase().contains(q) ||
                 n.labels.any { it.lowercase().contains(q) }
@@ -119,6 +142,21 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     fun openSection(newSection: Section) {
         section = newSection
         query = ""
+        noteFilter = NoteFilter.All
+    }
+
+    fun setFilter(filter: NoteFilter) {
+        noteFilter = filter
+    }
+
+    /** Ticks a checklist item straight from the notes grid. */
+    fun toggleItem(noteId: String, itemId: String) {
+        update(listOf(noteId)) { n ->
+            n.copy(
+                items = n.items.map { if (it.id == itemId) it.copy(checked = !it.checked) else it },
+                updatedAt = System.currentTimeMillis(),
+            )
+        }
     }
 
     // ---------- Persistence helpers ----------
@@ -198,6 +236,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
                 id = java.util.UUID.randomUUID().toString(),
                 title = if (it.title.isBlank()) "" else it.title + " (copy)",
                 reminderAt = null,
+                repeat = com.noe.app.data.Repeat.None,
                 pinned = false,
                 createdAt = now,
                 updatedAt = now,
@@ -289,10 +328,12 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Called with whatever launched the app: a notification tap or shared text. */
-    fun handleLaunch(noteId: String?, sharedText: String?) {
+    fun handleLaunch(noteId: String?, sharedText: String?, action: String? = null) {
         when {
             noteId != null -> openNote(noteId)
             !sharedText.isNullOrBlank() -> openNew(text = sharedText)
+            action == "new_note" -> openNew()
+            action == "new_checklist" -> openNew(checklist = true)
         }
     }
 

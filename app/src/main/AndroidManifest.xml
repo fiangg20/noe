@@ -27,10 +27,17 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
 
         <receiver
             android:name=".data.ReminderReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".data.SnoozeReceiver"
             android:exported="false" />
 
         <receiver

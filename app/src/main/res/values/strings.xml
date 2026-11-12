@@ -1,4 +1,8 @@
 <resources>
     <string name="app_name">Noe</string>
     <string name="channel_reminders">Note reminders</string>
+    <string name="shortcut_note">New note</string>
+    <string name="shortcut_note_long">Write a new note</string>
+    <string name="shortcut_checklist">New checklist</string>
+    <string name="shortcut_checklist_long">Start a new checklist</string>
 </resources>

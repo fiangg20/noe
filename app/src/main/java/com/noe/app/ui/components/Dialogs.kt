@@ -29,7 +29,7 @@ import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.WbTwilight
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -55,6 +55,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.noe.app.data.Repeat
 import com.noe.app.ui.theme.NoteColors
 import com.noe.app.ui.theme.noteContainerColor
 import java.util.Calendar
@@ -164,9 +165,13 @@ fun LabelDialog(
                                 .padding(vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Checkbox(
+                            MorphCheck(
                                 checked = label in checked,
                                 onCheckedChange = { onToggle(label, it) },
+                                tint = MaterialTheme.colorScheme.primary,
+                                checkColor = MaterialTheme.colorScheme.onPrimary,
+                                size = 22.dp,
+                                touch = 48.dp,
                             )
                             Text(label, style = MaterialTheme.typography.bodyLarge)
                         }
@@ -228,17 +233,19 @@ private fun ReminderOption(icon: ImageVector, text: String, onClick: () -> Unit)
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ReminderDialog(
     current: Long?,
-    onSet: (Long) -> Unit,
+    currentRepeat: Repeat,
+    onSet: (Long, Repeat) -> Unit,
     onClear: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
     var step by remember { mutableIntStateOf(0) }
     var pickedDate by remember { mutableStateOf<Long?>(null) }
+    var repeat by remember { mutableStateOf(currentRepeat) }
     val now = System.currentTimeMillis()
 
     when (step) {
@@ -247,12 +254,31 @@ fun ReminderDialog(
             title = { Text("Remind me") },
             text = {
                 Column {
-                    ReminderOption(Icons.Outlined.Schedule, "In 1 hour") { onSet(now + 60L * 60L * 1000L) }
+                    Text(
+                        text = "Repeat",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 8.dp, bottom = 4.dp),
+                    )
+                    FlowRow(
+                        modifier = Modifier.padding(start = 8.dp, bottom = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Repeat.entries.forEach { option ->
+                            FilterChip(
+                                selected = repeat == option,
+                                onClick = { repeat = option },
+                                label = { Text(option.label) },
+                                shape = CircleShape,
+                            )
+                        }
+                    }
+                    ReminderOption(Icons.Outlined.Schedule, "In 1 hour") { onSet(now + 60L * 60L * 1000L, repeat) }
                     val tonight = atTime(0, 20)
                     if (tonight > now + 30L * 60L * 1000L) {
-                        ReminderOption(Icons.Outlined.WbTwilight, "This evening, 20:00") { onSet(tonight) }
+                        ReminderOption(Icons.Outlined.WbTwilight, "This evening, 20:00") { onSet(tonight, repeat) }
                     }
-                    ReminderOption(Icons.Outlined.Alarm, "Tomorrow morning, 08:00") { onSet(atTime(1, 8)) }
+                    ReminderOption(Icons.Outlined.Alarm, "Tomorrow morning, 08:00") { onSet(atTime(1, 8), repeat) }
                     ReminderOption(Icons.Outlined.CalendarMonth, "Pick date and time") { step = 1 }
                     if (current != null) {
                         ReminderOption(Icons.Outlined.NotificationsOff, "Remove reminder") { onClear() }
@@ -301,7 +327,7 @@ fun ReminderDialog(
                                 if (at <= System.currentTimeMillis()) {
                                     Toast.makeText(context, "Pick a time in the future", Toast.LENGTH_SHORT).show()
                                 } else {
-                                    onSet(at)
+                                    onSet(at, repeat)
                                 }
                             }
                         },

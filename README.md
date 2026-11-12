@@ -5,17 +5,24 @@ The APK is built by GitHub Actions, so Android Studio is not needed.
 
 ## Features
 
-- Text notes and checklists (press Enter to add the next item, completed items collapse)
+- Text notes and checklists (press Enter to add the next item, completed items collapse, "Clear" removes them)
+- Text styling in text notes: bold, italic, underline, strikethrough and four text sizes (tap the Aa button in the editor's bottom bar; select text first, or pick a style and keep typing)
+- Tick checklist items straight from the notes grid; wavy progress bars show how far along a list is
+- Filter chips on the home screen: All, Notes, Checklists, Reminders, Colored
+- Greeting header with your name (set it in Settings) and a short summary of your notes
 - Pin, archive, trash (auto-deleted after 30 days) and undo
 - 10 note colors and labels, with a label list in the side drawer
 - Search across titles, text and labels
-- Reminders that show a notification (quick picks or a date and time picker)
+- Reminders that show a notification (quick picks or a date and time picker), can repeat daily or weekly, with a Snooze 1 hour button
+- Launcher shortcuts (long-press the app icon): New note and New checklist
+- Word count and Copy to clipboard in the editor
 - Grid or list view, sort by edited, created or title
 - Multi-select: pin, archive, delete, color, label, duplicate, share
 - Share text from other apps into a new note
 - Backup: export all notes to a JSON file and import them back
-- Material 3 Expressive theme: dynamic color on Android 12+, 6 accent palettes on older phones,
-  light, dark or system mode, expressive motion, FAB menu and shape-morphing empty states
+- Expressive look on stable Material 3 1.4.0: dynamic color on Android 12+, 6 accent palettes,
+  light, dark or system mode, rounded shapes, bold type, spring-animated FAB menu, morphing checkboxes, press-scale cards, wavy progress and cookie-shaped shapes.
+  (The official Material 3 Expressive component APIs are not public in 1.4.0, so these are built by hand.)
 
 ## Get the APK
 

@@ -12,7 +12,9 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.TransformOrigin
@@ -41,6 +43,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.Archive
@@ -71,6 +74,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -110,9 +115,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.noe.app.data.Note
+import com.noe.app.ui.NoteFilter
 import com.noe.app.ui.NotesViewModel
 import com.noe.app.ui.Section
 import com.noe.app.ui.components.ColorPickerDialog
+import com.noe.app.ui.components.CookieAvatar
 import com.noe.app.ui.components.EmptyState
 import com.noe.app.ui.components.LabelDialog
 import com.noe.app.ui.components.NoteCard
@@ -333,28 +340,43 @@ fun HomeScreen(vm: NotesViewModel, gridState: LazyStaggeredGridState) {
                 val pinned = notes.filter { it.pinned }
                 val others = notes.filter { !it.pinned }
 
+                val filterable = section == Section.Notes || section is Section.Label
                 val header: @Composable () -> Unit = {
-                    SectionHeader(
-                        title = section.title(),
-                        section = section,
-                        hasNotes = notes.isNotEmpty(),
-                        onEmptyTrash = { confirmEmptyTrash = true },
-                        onRename = { showRenameLabel = true },
-                        onDeleteLabel = { showDeleteLabel = true },
-                    )
+                    Column {
+                        if (section == Section.Notes && vm.query.isBlank()) {
+                            HomeHero(userName = vm.settings.userName, notes = vm.notes)
+                        } else {
+                            SectionHeader(
+                                title = section.title(),
+                                section = section,
+                                hasNotes = notes.isNotEmpty(),
+                                onEmptyTrash = { confirmEmptyTrash = true },
+                                onRename = { showRenameLabel = true },
+                                onDeleteLabel = { showDeleteLabel = true },
+                            )
+                        }
+                        if (filterable && (vm.noteFilter != NoteFilter.All || notes.isNotEmpty())) {
+                            FilterRow(current = vm.noteFilter, onSelect = { vm.setFilter(it) })
+                        }
+                    }
                 }
 
                 if (notes.isEmpty()) {
-                    Column(modifier = Modifier.padding(padding)) {
+                    Column(modifier = Modifier.padding(padding).padding(horizontal = 16.dp)) {
                         header()
                         Box(modifier = Modifier.weight(1f)) {
-                            EmptyHome(section = section, searching = vm.query.isNotBlank())
+                            EmptyHome(
+                                section = section,
+                                searching = vm.query.isNotBlank() || vm.noteFilter != NoteFilter.All,
+                            )
                         }
                     }
                 } else {
                     val clickNote: (Note) -> Unit = { note ->
                         if (inSelection || inTrash) toggleSelect(note.id) else vm.openNote(note.id)
                     }
+                    fun toggleFor(note: Note): ((String) -> Unit)? =
+                        if (inSelection || inTrash) null else ({ itemId: String -> vm.toggleItem(note.id, itemId) })
 
                     LazyVerticalStaggeredGrid(
                         columns = if (vm.settings.gridView) StaggeredGridCells.Adaptive(170.dp)
@@ -382,6 +404,7 @@ fun HomeScreen(vm: NotesViewModel, gridState: LazyStaggeredGridState) {
                                     selected = note.id in selected,
                                     onClick = { clickNote(note) },
                                     onLongClick = { toggleSelect(note.id) },
+                                    onToggleItem = toggleFor(note),
                                     modifier = Modifier.animateItem(),
                                 )
                             }
@@ -397,6 +420,7 @@ fun HomeScreen(vm: NotesViewModel, gridState: LazyStaggeredGridState) {
                                 selected = note.id in selected,
                                 onClick = { clickNote(note) },
                                 onLongClick = { toggleSelect(note.id) },
+                                onToggleItem = toggleFor(note),
                                 modifier = Modifier.animateItem(),
                             )
                         }
@@ -565,13 +589,13 @@ private fun SearchPill(
     Box(
         modifier = Modifier
             .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
     ) {
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(60.dp),
-            shape = RoundedCornerShape(30.dp),
+                .height(56.dp),
+            shape = RoundedCornerShape(28.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -624,7 +648,7 @@ private fun SectionHeader(
     onRename: () -> Unit,
     onDeleteLabel: () -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 8.dp, bottom = 8.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp, bottom = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = title,
@@ -652,12 +676,91 @@ private fun SectionHeader(
 }
 
 @Composable
+private fun HomeHero(userName: String, notes: List<Note>) {
+    val greeting = remember {
+        when (java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)) {
+            in 5..11 -> "Good morning"
+            in 12..16 -> "Good afternoon"
+            in 17..21 -> "Good evening"
+            else -> "Good night"
+        }
+    }
+    val stats = remember(notes) {
+        val now = System.currentTimeMillis()
+        val live = notes.filter { !it.trashed && !it.archived }
+        val tasksLeft = live.filter { it.isChecklist }.sumOf { n -> n.checklistProgress.let { it.second - it.first } }
+        val upcoming = notes.count { !it.trashed && (it.reminderAt ?: 0L) > now }
+        val parts = ArrayList<String>()
+        parts.add(if (live.size == 1) "1 note" else "${live.size} notes")
+        if (tasksLeft > 0) parts.add(if (tasksLeft == 1) "1 task left" else "$tasksLeft tasks left")
+        if (upcoming > 0) parts.add(if (upcoming == 1) "1 reminder" else "$upcoming reminders")
+        parts.joinToString(" · ")
+    }
+    val name = userName.trim()
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = if (name.isEmpty()) greeting else "$greeting, $name",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = "Notes",
+                style = MaterialTheme.typography.headlineLarge,
+                maxLines = 1,
+            )
+            Text(
+                text = stats,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        CookieAvatar(letter = (name.firstOrNull() ?: 'N').uppercase(), size = 56.dp)
+    }
+}
+
+@Composable
+private fun FilterRow(current: NoteFilter, onSelect: (NoteFilter) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        NoteFilter.entries.forEach { f ->
+            val isSelected = f == current
+            FilterChip(
+                selected = isSelected,
+                onClick = { onSelect(f) },
+                label = { Text(f.label) },
+                leadingIcon = if (isSelected) {
+                    { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) }
+                } else null,
+                shape = RoundedCornerShape(50),
+            )
+        }
+    }
+}
+
+@Composable
 private fun GroupLabel(text: String) {
     Text(
         text = text.uppercase(),
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 8.dp, top = 4.dp),
+        modifier = Modifier.padding(start = 4.dp, top = 4.dp),
     )
 }
 
@@ -667,7 +770,7 @@ private fun EmptyHome(section: Section, searching: Boolean) {
         searching -> EmptyState(
             icon = Icons.Outlined.Search,
             title = "No matches",
-            subtitle = "Nothing here matches your search.",
+            subtitle = "Nothing here matches your search or filter.",
         )
         else -> when (section) {
             Section.Notes -> EmptyState(

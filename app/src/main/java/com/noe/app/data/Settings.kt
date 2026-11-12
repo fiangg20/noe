@@ -12,6 +12,7 @@ data class AppSettings(
     val seedIndex: Int = 0,
     val gridView: Boolean = true,
     val sortOrder: SortOrder = SortOrder.Edited,
+    val userName: String = "",
 )
 
 class SettingsStore(context: Context) {
@@ -24,6 +25,7 @@ class SettingsStore(context: Context) {
         seedIndex = prefs.getInt("seedIndex", 0),
         gridView = prefs.getBoolean("gridView", true),
         sortOrder = enumOf(prefs.getString("sortOrder", null), SortOrder.Edited),
+        userName = prefs.getString("userName", "") ?: "",
     )
 
     fun save(s: AppSettings) {
@@ -33,6 +35,7 @@ class SettingsStore(context: Context) {
             .putInt("seedIndex", s.seedIndex)
             .putBoolean("gridView", s.gridView)
             .putString("sortOrder", s.sortOrder.name)
+            .putString("userName", s.userName)
             .apply()
     }
 

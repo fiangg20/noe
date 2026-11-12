@@ -35,6 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -127,6 +128,23 @@ fun SettingsScreen(vm: NotesViewModel) {
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            SettingsGroup("Profile") {
+                Text(
+                    "Your name shows up in the greeting on the home screen.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = settings.userName,
+                    onValueChange = { v -> vm.updateSettings { it.copy(userName = v.take(24)) } },
+                    singleLine = true,
+                    label = { Text("Your name") },
+                    shape = MaterialTheme.shapes.large,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
             SettingsGroup("Appearance") {
                 Text("Theme", style = MaterialTheme.typography.titleSmall)
                 Spacer(Modifier.height(8.dp))
@@ -263,7 +281,7 @@ fun SettingsScreen(vm: NotesViewModel) {
                 val active = vm.notes.count { !it.trashed && !it.archived }
                 val archived = vm.notes.count { !it.trashed && it.archived }
                 val trashed = vm.notes.count { it.trashed }
-                Text("Noe 1.0", style = MaterialTheme.typography.titleMedium)
+                Text("Noe 1.1", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "$active notes, $archived archived, $trashed in trash, ${vm.labels.size} labels",
