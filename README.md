@@ -9,7 +9,8 @@ The APK is built by GitHub Actions, so Android Studio is not needed.
 - Text styling in text notes: bold, italic, underline, strikethrough and four text sizes (tap the Aa button in the editor's bottom bar; select text first, or pick a style and keep typing)
 - Tick checklist items straight from the notes grid; wavy progress bars show how far along a list is
 - Filter chips on the home screen: All, Notes, Checklists, Reminders, Colored
-- Greeting header with your name (set it in Settings) and a short summary of your notes
+- Home header with a short summary of your notes (can be turned off in Settings)
+- Settings: theme, dynamic color, accent, pure black dark mode, text size, corner style, columns, preview length, default color for new notes
 - Pin, archive, trash (auto-deleted after 30 days) and undo
 - 10 note colors and labels, with a label list in the side drawer
 - Search across titles, text and labels
@@ -21,7 +22,7 @@ The APK is built by GitHub Actions, so Android Studio is not needed.
 - Share text from other apps into a new note
 - Backup: export all notes to a JSON file and import them back
 - Expressive look on stable Material 3 1.4.0: dynamic color on Android 12+, 6 accent palettes,
-  light, dark or system mode, rounded shapes, bold type, spring-animated FAB menu, morphing checkboxes, press-scale cards, wavy progress and cookie-shaped shapes.
+  light, dark or system mode, rounded shapes, bold type, spring-animated FAB menu, morphing checkboxes, press-scale cards, wavy progress and cookie-shaped badges, an extended FAB that collapses on scroll and chips that change shape when selected.
   (The official Material 3 Expressive component APIs are not public in 1.4.0, so these are built by hand.)
 
 ## Get the APK

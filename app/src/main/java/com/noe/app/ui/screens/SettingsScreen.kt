@@ -3,6 +3,20 @@ package com.noe.app.ui.screens
 import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.outlined.Backup
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.noe.app.data.SettingChoices
+import com.noe.app.ui.components.ColorPicker
+import com.noe.app.ui.components.CookieShape
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -35,7 +49,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -128,24 +141,7 @@ fun SettingsScreen(vm: NotesViewModel) {
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            SettingsGroup("Profile") {
-                Text(
-                    "Your name shows up in the greeting on the home screen.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = settings.userName,
-                    onValueChange = { v -> vm.updateSettings { it.copy(userName = v.take(24)) } },
-                    singleLine = true,
-                    label = { Text("Your name") },
-                    shape = MaterialTheme.shapes.large,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-
-            SettingsGroup("Appearance") {
+            SettingsGroup("Appearance", Icons.Outlined.Palette) {
                 Text("Theme", style = MaterialTheme.typography.titleSmall)
                 Spacer(Modifier.height(8.dp))
                 val modes = ThemeMode.entries
@@ -215,9 +211,48 @@ fun SettingsScreen(vm: NotesViewModel) {
                         }
                     }
                 }
+
+                SwitchRow(
+                    title = "Pure black dark mode",
+                    subtitle = "Black backgrounds, easier on OLED screens",
+                    checked = settings.amoled,
+                    onChange = { on -> vm.updateSettings { it.copy(amoled = on) } },
+                )
+
+                Spacer(Modifier.height(16.dp))
+                Text("Text size", style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.height(8.dp))
+                ChoiceRow(SettingChoices.textSizeLabels, settings.textSizeIndex) { i ->
+                    vm.updateSettings { it.copy(textSizeIndex = i) }
+                }
+
+                Spacer(Modifier.height(16.dp))
+                Text("Corner style", style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.height(8.dp))
+                ChoiceRow(SettingChoices.cornerLabels, settings.cornerIndex) { i ->
+                    vm.updateSettings { it.copy(cornerIndex = i) }
+                }
+                Spacer(Modifier.height(12.dp))
+                val previewCorner by animateDpAsState(
+                    targetValue = SettingChoices.cornerDp.getOrElse(settings.cornerIndex) { 28 }.dp,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+                    label = "cornerPreview",
+                )
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp),
+                    shape = RoundedCornerShape(previewCorner),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("This is how note cards look", style = MaterialTheme.typography.titleSmall)
+                    }
+                }
             }
 
-            SettingsGroup("Notes") {
+            SettingsGroup("Notes", Icons.Outlined.Description) {
                 Text("Layout", style = MaterialTheme.typography.titleSmall)
                 Spacer(Modifier.height(8.dp))
                 SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
@@ -254,9 +289,41 @@ fun SettingsScreen(vm: NotesViewModel) {
                         )
                     }
                 }
+
+                if (settings.gridView) {
+                    Spacer(Modifier.height(16.dp))
+                    Text("Columns", style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.height(8.dp))
+                    ChoiceRow(SettingChoices.columnLabels, settings.columnsIndex) { i ->
+                        vm.updateSettings { it.copy(columnsIndex = i) }
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+                Text("Preview length", style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.height(8.dp))
+                ChoiceRow(SettingChoices.previewLabels, settings.previewIndex) { i ->
+                    vm.updateSettings { it.copy(previewIndex = i) }
+                }
+
+                Spacer(Modifier.height(16.dp))
+                SwitchRow(
+                    title = "Show summary",
+                    subtitle = "Note, task and reminder counts under the title",
+                    checked = settings.showStats,
+                    onChange = { on -> vm.updateSettings { it.copy(showStats = on) } },
+                )
+
+                Spacer(Modifier.height(16.dp))
+                Text("Color for new notes", style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.height(12.dp))
+                ColorPicker(
+                    selected = settings.defaultColor,
+                    onSelect = { i -> vm.updateSettings { it.copy(defaultColor = i) } },
+                )
             }
 
-            SettingsGroup("Backup") {
+            SettingsGroup("Backup", Icons.Outlined.Backup) {
                 Text(
                     "Save all your notes to a file, or restore them from one. Importing merges with your current notes and keeps the newest version of each.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -277,7 +344,7 @@ fun SettingsScreen(vm: NotesViewModel) {
                 }
             }
 
-            SettingsGroup("About") {
+            SettingsGroup("About", Icons.Outlined.Info) {
                 val active = vm.notes.count { !it.trashed && !it.archived }
                 val archived = vm.notes.count { !it.trashed && it.archived }
                 val trashed = vm.notes.count { it.trashed }
@@ -302,20 +369,70 @@ fun SettingsScreen(vm: NotesViewModel) {
 }
 
 @Composable
-private fun SettingsGroup(title: String, content: @Composable () -> Unit) {
+private fun SettingsGroup(title: String, icon: ImageVector, content: @Composable () -> Unit) {
+    val badge = remember { CookieShape(7, 0.09f) }
     Column {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(start = 8.dp, bottom = 8.dp),
-        )
+        Row(
+            modifier = Modifier.padding(start = 4.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(badge)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.large,
+            shape = RoundedCornerShape(36.dp),
             color = MaterialTheme.colorScheme.surfaceContainerLow,
         ) {
-            Column(modifier = Modifier.padding(20.dp)) { content() }
+            Column(modifier = Modifier.padding(22.dp)) { content() }
         }
+    }
+}
+
+@Composable
+private fun ChoiceRow(labels: List<String>, selectedIndex: Int, onSelect: (Int) -> Unit) {
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+        labels.forEachIndexed { index, label ->
+            SegmentedButton(
+                selected = index == selectedIndex,
+                onClick = { onSelect(index) },
+                shape = SegmentedButtonDefaults.itemShape(index, labels.size),
+                label = { Text(label, maxLines = 1) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SwitchRow(title: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Switch(checked = checked, onCheckedChange = onChange)
     }
 }

@@ -71,6 +71,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import com.noe.app.data.Note
 import com.noe.app.data.Repeat
+import com.noe.app.ui.theme.LocalNoeStyle
 import com.noe.app.ui.theme.noteContainerColor
 import com.noe.app.ui.theme.noteContentColor
 import java.text.DateFormat
@@ -140,10 +141,12 @@ fun NoteCard(
     val container = noteContainerColor(note.colorIndex, dark, scheme.surfaceContainerLow)
     val content = noteContentColor(note.colorIndex, dark, scheme.onSurface)
     val haptic = LocalHapticFeedback.current
+    val style = LocalNoeStyle.current
+    val badgeShape = remember { CookieShape(8, 0.1f) }
 
     // Selected cards squish toward a tighter corner, which gives the grid a springy feel.
     val corner by animateDpAsState(
-        targetValue = if (selected) 12.dp else 28.dp,
+        targetValue = if (selected) (style.cardCorner / 2) else style.cardCorner,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "cardCorner",
     )
@@ -199,7 +202,7 @@ fun NoteCard(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier
                                 .weight(1f)
-                                .padding(end = if (note.pinned || selected) 24.dp else 0.dp),
+                                .padding(end = if (note.pinned || selected) 30.dp else 0.dp),
                         )
                     }
                 }
@@ -272,7 +275,7 @@ fun NoteCard(
                     Text(
                         text = richBody,
                         style = if (note.spans.isEmpty()) bodyStyle else bodyStyle.copy(lineHeight = TextUnit.Unspecified),
-                        maxLines = 10,
+                        maxLines = style.previewLines,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
@@ -302,9 +305,9 @@ fun NoteCard(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(10.dp)
-                        .size(24.dp)
-                        .clip(CircleShape)
+                        .padding(8.dp)
+                        .size(30.dp)
+                        .clip(badgeShape)
                         .background(scheme.primary),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -312,18 +315,26 @@ fun NoteCard(
                         Icons.Filled.Check,
                         contentDescription = "Selected",
                         tint = scheme.onPrimary,
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(18.dp),
                     )
                 }
             } else if (note.pinned) {
-                Icon(
-                    Icons.Filled.PushPin,
-                    contentDescription = "Pinned",
+                Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(12.dp)
-                        .size(18.dp),
-                )
+                        .padding(8.dp)
+                        .size(30.dp)
+                        .clip(badgeShape)
+                        .background(scheme.primaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Filled.PushPin,
+                        contentDescription = "Pinned",
+                        tint = scheme.onPrimaryContainer,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
             }
         }
     }

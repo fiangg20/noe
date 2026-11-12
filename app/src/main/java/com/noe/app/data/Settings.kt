@@ -6,13 +6,33 @@ enum class ThemeMode { System, Light, Dark }
 
 enum class SortOrder { Edited, Created, Title }
 
+/** Choices for the customization options. Settings store the index into these lists. */
+object SettingChoices {
+    val textSizeLabels = listOf("Small", "Default", "Large", "Huge")
+    val textSizeScales = listOf(0.9f, 1f, 1.15f, 1.3f)
+
+    val cornerLabels = listOf("Sharp", "Soft", "Round", "Pill")
+    val cornerDp = listOf(12, 20, 28, 40)
+
+    val columnLabels = listOf("Auto", "2", "3")
+
+    val previewLabels = listOf("Short", "Medium", "Long")
+    val previewLines = listOf(4, 10, 24)
+}
+
 data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.System,
     val dynamicColor: Boolean = true,
     val seedIndex: Int = 0,
     val gridView: Boolean = true,
     val sortOrder: SortOrder = SortOrder.Edited,
-    val userName: String = "",
+    val amoled: Boolean = false,
+    val textSizeIndex: Int = 1,
+    val cornerIndex: Int = 2,
+    val columnsIndex: Int = 0,
+    val previewIndex: Int = 1,
+    val defaultColor: Int = 0,
+    val showStats: Boolean = true,
 )
 
 class SettingsStore(context: Context) {
@@ -25,7 +45,13 @@ class SettingsStore(context: Context) {
         seedIndex = prefs.getInt("seedIndex", 0),
         gridView = prefs.getBoolean("gridView", true),
         sortOrder = enumOf(prefs.getString("sortOrder", null), SortOrder.Edited),
-        userName = prefs.getString("userName", "") ?: "",
+        amoled = prefs.getBoolean("amoled", false),
+        textSizeIndex = prefs.getInt("textSizeIndex", 1),
+        cornerIndex = prefs.getInt("cornerIndex", 2),
+        columnsIndex = prefs.getInt("columnsIndex", 0),
+        previewIndex = prefs.getInt("previewIndex", 1),
+        defaultColor = prefs.getInt("defaultColor", 0),
+        showStats = prefs.getBoolean("showStats", true),
     )
 
     fun save(s: AppSettings) {
@@ -35,7 +61,13 @@ class SettingsStore(context: Context) {
             .putInt("seedIndex", s.seedIndex)
             .putBoolean("gridView", s.gridView)
             .putString("sortOrder", s.sortOrder.name)
-            .putString("userName", s.userName)
+            .putBoolean("amoled", s.amoled)
+            .putInt("textSizeIndex", s.textSizeIndex)
+            .putInt("cornerIndex", s.cornerIndex)
+            .putInt("columnsIndex", s.columnsIndex)
+            .putInt("previewIndex", s.previewIndex)
+            .putInt("defaultColor", s.defaultColor)
+            .putBoolean("showStats", s.showStats)
             .apply()
     }
 

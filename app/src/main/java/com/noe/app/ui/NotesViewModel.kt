@@ -270,6 +270,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
             body = if (checklist) "" else text.orEmpty(),
             items = if (checklist) listOf(com.noe.app.data.ChecklistItem()) else emptyList(),
             labels = if (s is Section.Label) listOf(s.name) else emptyList(),
+            colorIndex = settings.defaultColor,
         )
         editor = EditorState(note)
     }

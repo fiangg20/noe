@@ -192,12 +192,18 @@ fun HomeScreen(vm: NotesViewModel, gridState: LazyStaggeredGridState) {
         drawerContent = {
             ModalDrawerSheet {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    Text(
-                        text = "Noe",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.primary,
+                    Row(
                         modifier = Modifier.padding(horizontal = 28.dp, vertical = 24.dp),
-                    )
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CookieAvatar(letter = "N", size = 48.dp)
+                        Spacer(Modifier.width(16.dp))
+                        Text(
+                            text = "Noe",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                     DrawerItem("Notes", Icons.Outlined.Lightbulb, section == Section.Notes) { goTo(Section.Notes) }
                     DrawerItem("Reminders", Icons.Outlined.Notifications, section == Section.Reminders) {
                         goTo(Section.Reminders)
@@ -343,18 +349,19 @@ fun HomeScreen(vm: NotesViewModel, gridState: LazyStaggeredGridState) {
                 val filterable = section == Section.Notes || section is Section.Label
                 val header: @Composable () -> Unit = {
                     Column {
-                        if (section == Section.Notes && vm.query.isBlank()) {
-                            HomeHero(userName = vm.settings.userName, notes = vm.notes)
-                        } else {
-                            SectionHeader(
-                                title = section.title(),
-                                section = section,
-                                hasNotes = notes.isNotEmpty(),
-                                onEmptyTrash = { confirmEmptyTrash = true },
-                                onRename = { showRenameLabel = true },
-                                onDeleteLabel = { showDeleteLabel = true },
-                            )
-                        }
+                        SectionHeader(
+                            title = section.title(),
+                            subtitle = if (section == Section.Notes && vm.query.isBlank() && vm.settings.showStats) {
+                                notesSummary(vm.notes)
+                            } else {
+                                null
+                            },
+                            section = section,
+                            hasNotes = notes.isNotEmpty(),
+                            onEmptyTrash = { confirmEmptyTrash = true },
+                            onRename = { showRenameLabel = true },
+                            onDeleteLabel = { showDeleteLabel = true },
+                        )
                         if (filterable && (vm.noteFilter != NoteFilter.All || notes.isNotEmpty())) {
                             FilterRow(current = vm.noteFilter, onSelect = { vm.setFilter(it) })
                         }
@@ -379,8 +386,12 @@ fun HomeScreen(vm: NotesViewModel, gridState: LazyStaggeredGridState) {
                         if (inSelection || inTrash) null else ({ itemId: String -> vm.toggleItem(note.id, itemId) })
 
                     LazyVerticalStaggeredGrid(
-                        columns = if (vm.settings.gridView) StaggeredGridCells.Adaptive(170.dp)
-                        else StaggeredGridCells.Fixed(1),
+                        columns = if (!vm.settings.gridView) StaggeredGridCells.Fixed(1)
+                        else when (vm.settings.columnsIndex) {
+                            1 -> StaggeredGridCells.Fixed(2)
+                            2 -> StaggeredGridCells.Fixed(3)
+                            else -> StaggeredGridCells.Adaptive(170.dp)
+                        },
                         state = gridState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(
@@ -440,8 +451,10 @@ fun HomeScreen(vm: NotesViewModel, gridState: LazyStaggeredGridState) {
                             ) { fabExpanded = false },
                     )
                 }
+                val atTop by remember { derivedStateOf { gridState.firstVisibleItemIndex == 0 } }
                 NewNoteFab(
                     expanded = fabExpanded,
+                    extended = atTop || fabExpanded,
                     onToggle = { fabExpanded = !fabExpanded },
                     onChecklist = {
                         fabExpanded = false
@@ -642,6 +655,7 @@ private fun SearchPill(
 @Composable
 private fun SectionHeader(
     title: String,
+    subtitle: String?,
     section: Section,
     hasNotes: Boolean,
     onEmptyTrash: () -> Unit,
@@ -652,7 +666,7 @@ private fun SectionHeader(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.headlineLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -665,6 +679,13 @@ private fun SectionHeader(
                 TextButton(onClick = onEmptyTrash) { Text("Empty trash") }
             }
         }
+        if (subtitle != null) {
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         if (section == Section.Trash) {
             Text(
                 text = "Notes in the trash are deleted after 30 days. Tap a note to select it.",
@@ -675,59 +696,16 @@ private fun SectionHeader(
     }
 }
 
-@Composable
-private fun HomeHero(userName: String, notes: List<Note>) {
-    val greeting = remember {
-        when (java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)) {
-            in 5..11 -> "Good morning"
-            in 12..16 -> "Good afternoon"
-            in 17..21 -> "Good evening"
-            else -> "Good night"
-        }
-    }
-    val stats = remember(notes) {
-        val now = System.currentTimeMillis()
-        val live = notes.filter { !it.trashed && !it.archived }
-        val tasksLeft = live.filter { it.isChecklist }.sumOf { n -> n.checklistProgress.let { it.second - it.first } }
-        val upcoming = notes.count { !it.trashed && (it.reminderAt ?: 0L) > now }
-        val parts = ArrayList<String>()
-        parts.add(if (live.size == 1) "1 note" else "${live.size} notes")
-        if (tasksLeft > 0) parts.add(if (tasksLeft == 1) "1 task left" else "$tasksLeft tasks left")
-        if (upcoming > 0) parts.add(if (upcoming == 1) "1 reminder" else "$upcoming reminders")
-        parts.joinToString(" · ")
-    }
-    val name = userName.trim()
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = if (name.isEmpty()) greeting else "$greeting, $name",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = "Notes",
-                style = MaterialTheme.typography.headlineLarge,
-                maxLines = 1,
-            )
-            Text(
-                text = stats,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Spacer(Modifier.width(12.dp))
-        CookieAvatar(letter = (name.firstOrNull() ?: 'N').uppercase(), size = 56.dp)
-    }
+private fun notesSummary(notes: List<Note>): String {
+    val now = System.currentTimeMillis()
+    val live = notes.filter { !it.trashed && !it.archived }
+    val tasksLeft = live.filter { it.isChecklist }.sumOf { n -> n.checklistProgress.let { it.second - it.first } }
+    val upcoming = notes.count { !it.trashed && (it.reminderAt ?: 0L) > now }
+    val parts = ArrayList<String>()
+    parts.add(if (live.size == 1) "1 note" else "${live.size} notes")
+    if (tasksLeft > 0) parts.add(if (tasksLeft == 1) "1 task left" else "$tasksLeft tasks left")
+    if (upcoming > 0) parts.add(if (upcoming == 1) "1 reminder" else "$upcoming reminders")
+    return parts.joinToString(" · ")
 }
 
 @Composable
@@ -741,6 +719,11 @@ private fun FilterRow(current: NoteFilter, onSelect: (NoteFilter) -> Unit) {
     ) {
         NoteFilter.entries.forEach { f ->
             val isSelected = f == current
+            val chipCorner by animateDpAsState(
+                targetValue = if (isSelected) 8.dp else 16.dp,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                label = "chipCorner",
+            )
             FilterChip(
                 selected = isSelected,
                 onClick = { onSelect(f) },
@@ -748,7 +731,7 @@ private fun FilterRow(current: NoteFilter, onSelect: (NoteFilter) -> Unit) {
                 leadingIcon = if (isSelected) {
                     { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) }
                 } else null,
-                shape = RoundedCornerShape(50),
+                shape = RoundedCornerShape(chipCorner),
             )
         }
     }
@@ -810,6 +793,7 @@ private fun EmptyHome(section: Section, searching: Boolean) {
 @Composable
 private fun NewNoteFab(
     expanded: Boolean,
+    extended: Boolean,
     onToggle: () -> Unit,
     onChecklist: () -> Unit,
     onNote: () -> Unit,
@@ -821,7 +805,7 @@ private fun NewNoteFab(
         label = "fabRotation",
     )
     val corner by animateDpAsState(
-        targetValue = if (expanded) 30.dp else 18.dp,
+        targetValue = if (expanded) 32.dp else 20.dp,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
         label = "fabCorner",
     )
@@ -848,18 +832,21 @@ private fun NewNoteFab(
                 MenuFab("Note", Icons.Outlined.Description, onNote)
             }
         }
-        FloatingActionButton(
+        ExtendedFloatingActionButton(
             onClick = onToggle,
+            expanded = extended,
             shape = RoundedCornerShape(corner),
             containerColor = MaterialTheme.colorScheme.primaryContainer,
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Add,
-                contentDescription = if (expanded) "Close menu" else "New note",
-                modifier = Modifier.rotate(rotation),
-            )
-        }
+            icon = {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = if (expanded) "Close menu" else "New note",
+                    modifier = Modifier.rotate(rotation),
+                )
+            },
+            text = { Text(if (expanded) "Close" else "New") },
+        )
     }
 }
 
