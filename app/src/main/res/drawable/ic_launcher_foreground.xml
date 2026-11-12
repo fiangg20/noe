@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Folded-corner note page -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M34,30 L62,30 L76,44 L76,78 Q76,82 72,82 L36,82 Q32,82 32,78 L32,34 Q32,30 36,30 Z" />
+    <!-- Text lines -->
+    <path
+        android:fillColor="#6750A4"
+        android:pathData="M40,52 L68,52 L68,56 L40,56 Z" />
+    <path
+        android:fillColor="#6750A4"
+        android:pathData="M40,62 L68,62 L68,66 L40,66 Z" />
+    <path
+        android:fillColor="#6750A4"
+        android:pathData="M40,72 L56,72 L56,76 L40,76 Z" />
+</vector>
