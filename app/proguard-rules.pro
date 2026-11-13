@@ -1,0 +1,1 @@
+-keep class dev.expressive.launcher.LauncherViewModel { <init>(android.app.Application); }

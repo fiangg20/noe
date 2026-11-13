@@ -1,5 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="noe_window_bg">#FFFBFF</color>
-    <color name="ic_launcher_background">#6750A4</color>
+    <color name="launcher_background">#FF0F0E15</color>
+    <color name="ic_launcher_background">#FF1B1730</color>
 </resources>
